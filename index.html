@@ -4,9 +4,40 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>환율 계산기</title>
+  <link rel="stylesheet" href="./css/style.css?v=1" />
 </head>
 <body>
-  <h1>환율 계산기</h1>
-  <p>여기에 계산기를 만들 예정입니다.</p>
+  <main class="wrap">
+    <h1>환율 계산기</h1>
+
+    <section class="card">
+      <div class="row">
+        <label for="rate">환율 (1 USD = KRW)</label>
+        <input id="rate" type="number" step="0.01" value="1400" />
+        <button id="loadRate" type="button" class="ghost">
+          준실시간 환율 불러오기
+        </button>
+        <p class="hint" id="rateMeta"></p>
+      </div>
+
+      <div class="grid">
+        <div class="row">
+          <label for="usd">달러 (USD)</label>
+          <input id="usd" type="number" step="0.01" />
+          <button id="toKrw" type="button">원화로 변환</button>
+        </div>
+
+        <div class="row">
+          <label for="krw">원화 (KRW)</label>
+          <input id="krw" type="number" step="1" />
+          <button id="toUsd" type="button">달러로 변환</button>
+        </div>
+      </div>
+
+      <div class="result" id="result">값을 입력하세요.</div>
+    </section>
+  </main>
+
+  <script src="./js/app.js?v=1"></script>
 </body>
 </html>
