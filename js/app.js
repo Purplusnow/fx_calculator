@@ -64,7 +64,8 @@ async function loadLiveRateUSDKRW() {
     loadRateBtn.textContent = "불러오는 중...";
 
     const res = await fetch("https://open.er-api.com/v6/latest/USD", { cache: "no-store" });
-    const data = await res.json();
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();    
 
     if (data.result !== "success") throw new Error("API failed");
 
