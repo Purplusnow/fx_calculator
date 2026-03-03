@@ -80,13 +80,13 @@ async function loadLiveRateUSDKRW() {
         : "업데이트 시간: 확인 불가";
     }
 
-    resultEl.textContent = "환율을 불러왔어요. 변환해 보세요.";
+    resultEl.textContent = "환율을 불러왔어요.";
   } catch (e) {
     resultEl.textContent = "환율을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.";
     if (rateMetaEl) rateMetaEl.textContent = "";
   } finally {
     loadRateBtn.disabled = false;
-    loadRateBtn.textContent = "준실시간 환율 불러오기";
+    loadRateBtn.textContent = "환율 불러오기";
   }
 }
 
