@@ -13,3 +13,4 @@ button.ghost { background: #eef1f7; color: #111; }
 .result { margin-top: 8px; padding: 12px; background: #f3f4f6; border-radius: 10px; font-size: 15px; }
 .actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
 .footer { margin-top: 14px; color: #6b7280; text-align: center; }
+* { box-sizing: border-box; }
