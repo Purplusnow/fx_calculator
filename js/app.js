@@ -1,103 +1,159 @@
-const rateEl = document.getElementById("rate");
-const usdEl = document.getElementById("usd");
-const krwEl = document.getElementById("krw");
+const amountEl = document.getElementById("amount");
+const fromEl = document.getElementById("fromCurrency");
+const toEl = document.getElementById("toCurrency");
+const convertBtn = document.getElementById("convertBtn");
+const swapBtn = document.getElementById("swapBtn");
+const loadRatesBtn = document.getElementById("loadRatesBtn");
 const resultEl = document.getElementById("result");
 const rateMetaEl = document.getElementById("rateMeta");
 
-const toKrwBtn = document.getElementById("toKrw");
-const toUsdBtn = document.getElementById("toUsd");
-const loadRateBtn = document.getElementById("loadRate");
+let rates = null;          // { "USD": 1, "KRW": 1450.3, ... } (base: USD)
+let lastUpdateUtc = null;  // string
 
 function n(v) {
   const x = Number(v);
   return Number.isFinite(x) ? x : NaN;
 }
 
-function fmtKrw(v) {
-  return Math.round(v).toLocaleString("ko-KR");
+function fmtNumber(v) {
+  if (!Number.isFinite(v)) return "";
+  // 너무 긴 소수 방지: 최대 6자리 소수, 불필요한 0 제거
+  const fixed = Math.round(v * 1e6) / 1e6;
+  return fixed.toLocaleString("en-US", { maximumFractionDigits: 6 });
 }
 
-function fmtUsd(v) {
-  return (Math.round(v * 100) / 100).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
+function setMeta(text) {
+  if (rateMetaEl) rateMetaEl.textContent = text || "";
 }
 
-function getRate() {
-  const r = n(rateEl.value);
-  if (!Number.isFinite(r) || r <= 0) return NaN;
-  return r;
+function setResult(text) {
+  if (resultEl) resultEl.textContent = text || "";
 }
 
-function usdToKrw() {
-  const rate = getRate();
-  const usd = n(usdEl.value);
-
-  if (!Number.isFinite(rate) || !Number.isFinite(usd)) {
-    resultEl.textContent = "환율과 USD 값을 올바르게 입력해 주세요.";
-    return;
-  }
-
-  const krw = usd * rate;
-  krwEl.value = String(Math.round(krw));
-  resultEl.textContent = `${fmtUsd(usd)} USD = ${fmtKrw(krw)} KRW`;
+function getSelected(selectEl) {
+  return (selectEl && selectEl.value) ? selectEl.value : null;
 }
 
-function krwToUsd() {
-  const rate = getRate();
-  const krw = n(krwEl.value);
+function fillCurrencySelects(rateMap) {
+  const codes = Object.keys(rateMap).sort();
 
-  if (!Number.isFinite(rate) || !Number.isFinite(krw)) {
-    resultEl.textContent = "환율과 KRW 값을 올바르게 입력해 주세요.";
-    return;
-  }
+  const makeOptions = (selected) =>
+    codes.map(code => `<option value="${code}"${code === selected ? " selected" : ""}>${code}</option>`).join("");
 
-  const usd = krw / rate;
-  usdEl.value = String(Math.round(usd * 100) / 100);
-  resultEl.textContent = `${fmtKrw(krw)} KRW = ${fmtUsd(usd)} USD`;
+  // 기본값: from=USD, to=KRW
+  const fromDefault = codes.includes("USD") ? "USD" : codes[0];
+  const toDefault = codes.includes("KRW") ? "KRW" : (codes.includes("JPY") ? "JPY" : codes[0]);
+
+  const prevFrom = getSelected(fromEl) || fromDefault;
+  const prevTo = getSelected(toEl) || toDefault;
+
+  fromEl.innerHTML = makeOptions(prevFrom);
+  toEl.innerHTML = makeOptions(prevTo);
 }
 
-async function loadLiveRateUSDKRW() {
+async function fetchRates() {
+  // open.er-api.com: base USD 최신 환율
+  const res = await fetch("https://open.er-api.com/v6/latest/USD", { cache: "no-store" });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+
+  const data = await res.json();
+  if (data.result !== "success") throw new Error("API failed");
+
+  const map = data.rates;
+  if (!map || typeof map !== "object") throw new Error("Bad rates");
+
+  // USD가 누락될 가능성 대비
+  map.USD = 1;
+
+  return {
+    rates: map,
+    lastUpdateUtc: data.time_last_update_utc || null
+  };
+}
+
+async function loadRates({ silent = false } = {}) {
   try {
-    loadRateBtn.disabled = true;
-    loadRateBtn.textContent = "불러오는 중...";
-
-    const res = await fetch("https://open.er-api.com/v6/latest/USD", { cache: "no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();    
-
-    if (data.result !== "success") throw new Error("API failed");
-
-    const krw = Number(data.rates?.KRW);
-    if (!Number.isFinite(krw) || krw <= 0) throw new Error("Bad KRW rate");
-
-    const rounded = Math.round(krw * 1000) / 1000;
-    rateEl.value = String(rounded);
-
-    if (rateMetaEl) {
-      rateMetaEl.textContent = data.time_last_update_utc
-        ? `업데이트(UTC): ${data.time_last_update_utc}`
-        : "업데이트 시간: 확인 불가";
+    if (!silent) {
+      loadRatesBtn.disabled = true;
+      loadRatesBtn.textContent = "불러오는 중...";
+      setResult("환율을 불러오는 중입니다.");
     }
 
-    resultEl.textContent = "환율을 불러왔어요.";
+    setMeta("환율 불러오는 중...");
+    const out = await fetchRates();
+
+    rates = out.rates;
+    lastUpdateUtc = out.lastUpdateUtc;
+
+    fillCurrencySelects(rates);
+
+    setMeta(lastUpdateUtc ? `업데이트(UTC): ${lastUpdateUtc}` : "업데이트 시간: 확인 불가");
+    setResult("환율을 불러왔습니다. 금액과 통화를 선택한 뒤 변환하세요.");
+
+    // 사용자가 금액을 이미 입력했으면 자동 변환(원치 않으면 삭제해도 됨)
+    if (amountEl.value) convert();
   } catch (e) {
-    resultEl.textContent = "환율을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.";
-    if (rateMetaEl) rateMetaEl.textContent = "";
+    setMeta("");
+    setResult("환율을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
   } finally {
-    loadRateBtn.disabled = false;
-    loadRateBtn.textContent = "환율 불러오기";
+    if (!silent) {
+      loadRatesBtn.disabled = false;
+      loadRatesBtn.textContent = "환율 다시 불러오기";
+    }
   }
 }
 
-toKrwBtn.addEventListener("click", usdToKrw);
-toUsdBtn.addEventListener("click", krwToUsd);
-loadRateBtn.addEventListener("click", loadLiveRateUSDKRW);
+function convert() {
+  if (!rates) {
+    setResult("아직 환율이 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.");
+    return;
+  }
 
-usdEl.addEventListener("keydown", (e) => { if (e.key === "Enter") usdToKrw(); });
-krwEl.addEventListener("keydown", (e) => { if (e.key === "Enter") krwToUsd(); });
-rateEl.addEventListener("keydown", (e) => { if (e.key === "Enter") usdToKrw(); });
+  const amount = n(amountEl.value);
+  const from = getSelected(fromEl);
+  const to = getSelected(toEl);
 
-// 페이지 로딩 시 자동으로 한 번 불러오기
-loadLiveRateUSDKRW();
+  if (!Number.isFinite(amount)) {
+    setResult("금액을 올바르게 입력해 주세요.");
+    return;
+  }
+  if (!from || !to) {
+    setResult("통화를 선택해 주세요.");
+    return;
+  }
+
+  const fromRate = Number(rates[from]);
+  const toRate = Number(rates[to]);
+
+  if (!Number.isFinite(fromRate) || fromRate <= 0 || !Number.isFinite(toRate) || toRate <= 0) {
+    setResult("선택한 통화의 환율 데이터를 찾지 못했습니다. 환율을 다시 불러와 주세요.");
+    return;
+  }
+
+  // base=USD 기준
+  // amount(from) -> USD: amount / fromRate
+  // USD -> to: (amount / fromRate) * toRate
+  const converted = (amount / fromRate) * toRate;
+
+  setResult(`${fmtNumber(amount)} ${from} = ${fmtNumber(converted)} ${to}`);
+}
+
+function swapCurrencies() {
+  const a = fromEl.value;
+  fromEl.value = toEl.value;
+  toEl.value = a;
+
+  if (amountEl.value) convert();
+}
+
+// 이벤트 바인딩
+convertBtn.addEventListener("click", convert);
+swapBtn.addEventListener("click", swapCurrencies);
+loadRatesBtn.addEventListener("click", () => loadRates({ silent: false }));
+
+amountEl.addEventListener("keydown", (e) => { if (e.key === "Enter") convert(); });
+fromEl.addEventListener("change", () => { if (amountEl.value) convert(); });
+toEl.addEventListener("change", () => { if (amountEl.value) convert(); });
+
+// 페이지 로딩 시 자동으로 환율 불러오기
+loadRates({ silent: true });
